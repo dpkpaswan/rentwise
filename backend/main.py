@@ -6,7 +6,8 @@ from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from pypdf import PdfReader
 
 from models import AnalyzeResponse, AskRequest, AskResponse, RedFlag
@@ -17,6 +18,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+MAX_QUESTION_LENGTH = 2000
+MAX_DOCUMENT_LENGTH = 100_000
 
 app = FastAPI(
     title="ClauseCheck API",
@@ -24,13 +27,46 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Restrict CORS to authorized origins.
+# In production on Render/Cloud Run, frontend and backend are served same-origin from the same container.
+# For local dev or separate deployments, explicit origins are whitelisted.
+allowed_origins_env = os.environ.get("ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://localhost:8080",
+        "https://rentwise-juvt.onrender.com",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error processing {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An internal error occurred. Please try again later."},
+    )
 
 
 @app.get("/health")
@@ -53,15 +89,20 @@ async def analyze(
     document_text = ""
 
     if file and file.filename:
-        # Read and validate file
-        contents = await file.read()
+        # Read file with size check to prevent memory exhaustion (DoS)
+        contents = bytearray()
+        CHUNK_SIZE = 1024 * 1024  # 1 MB chunks
+        while chunk := await file.read(CHUNK_SIZE):
+            contents.extend(chunk)
+            if len(contents) > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail="File is too large. Maximum size is 5 MB.",
+                )
+
         if len(contents) == 0:
             raise HTTPException(status_code=400, detail="The uploaded file is empty.")
-        if len(contents) > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=400,
-                detail="File is too large. Maximum size is 5 MB.",
-            )
+        contents = bytes(contents)
 
         if file.content_type == "application/pdf" or (
             file.filename and file.filename.lower().endswith(".pdf")
@@ -108,6 +149,12 @@ async def analyze(
             detail="The document text is too short to analyze. Please provide the full rental agreement.",
         )
 
+    if len(document_text) > MAX_DOCUMENT_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document text is too long. Maximum length is {MAX_DOCUMENT_LENGTH} characters.",
+        )
+
     try:
         result = analyze_document(document_text)
     except Exception as e:
@@ -117,9 +164,11 @@ async def analyze(
             detail="The AI service is currently unavailable. Please try again in a moment.",
         )
 
+    flags_list = [RedFlag(**flag) for flag in result.get("red_flags", [])]
     return AnalyzeResponse(
         summary=result.get("summary", []),
-        red_flags=[RedFlag(**flag) for flag in result.get("red_flags", [])],
+        red_flags=flags_list,
+        flags=flags_list,
         lawyer_questions=result.get("lawyer_questions", []),
         document_text=document_text,
     )
@@ -128,17 +177,23 @@ async def analyze(
 @app.post("/ask", response_model=AskResponse)
 async def ask(request: AskRequest):
     """Ask a question about the uploaded document."""
-    if not request.document_text.strip():
+    if not request.document_text or not request.document_text.strip():
         raise HTTPException(
             status_code=400, detail="No document text provided."
         )
-    if not request.question.strip():
+    if len(request.document_text) > MAX_DOCUMENT_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Document text is too long. Maximum length is {MAX_DOCUMENT_LENGTH} characters.",
+        )
+    if not request.question or not request.question.strip():
         raise HTTPException(
             status_code=400, detail="Please enter a question."
         )
-    if len(request.question) > 1000:
+    if len(request.question) > MAX_QUESTION_LENGTH:
         raise HTTPException(
-            status_code=400, detail="Question is too long. Please keep it under 1000 characters."
+            status_code=400,
+            detail=f"Question is too long. Please keep it under {MAX_QUESTION_LENGTH} characters.",
         )
 
     try:
@@ -154,6 +209,7 @@ async def ask(request: AskRequest):
         answer=result.get("answer", "Unable to process your question."),
         source_quote=result.get("source_quote"),
     )
+
 
 
 # Serve built frontend in production (Docker)

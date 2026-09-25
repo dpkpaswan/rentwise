@@ -123,7 +123,21 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173) in your browser.
 
+### Running Tests
+
+Run the automated test suite covering API endpoints, input validation, security boundaries, and red-flag quote verification:
+
+```bash
+# From repository root
+pytest tests/
+
+# Or from within backend directory
+cd backend
+pytest tests/
+```
+
 ---
+
 
 ## Deploy to Google Cloud Run
 

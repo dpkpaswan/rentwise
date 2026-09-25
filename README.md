@@ -1,16 +1,23 @@
 <div align="center">
 
-# ClauseCheck
+# RentWise (ClauseCheck)
 
-**Rental Agreement Risk Checker for Tenants in India**
+**AI-Powered Rental Agreement Risk Checker for Tenants in India**
 
-Understand your rental agreement before you sign.
-Upload your contract, get a plain English breakdown, and know what to ask a lawyer.
+[![Tests](https://img.shields.io/badge/tests-16%20passed-brightgreen.svg)]()
+[![FastAPI](https://img.shields.io/badge/backend-FastAPI-009688.svg)]()
+[![React](https://img.shields.io/badge/frontend-React%20%2B%20Vite-61DAFB.svg)]()
+[![Google Gemini](https://img.shields.io/badge/AI-Gemini%203.8%20Flash-4285F4.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
+
+Understand your rental agreement before you sign.  
+Upload your contract, get a plain-English breakdown, detect unfair clauses, and know what to ask a lawyer.
+
+🌐 **Live Application:** [https://rentwise-juvt.onrender.com](https://rentwise-juvt.onrender.com)
 
 ---
 
-> **Disclaimer:** This tool provides general information only, not legal advice.
-> Always consult a qualified lawyer before signing any agreement.
+> **⚠️ Disclaimer:** This tool provides general educational information only, not legal advice. Always consult a qualified lawyer before signing any rental agreement.
 
 </div>
 
@@ -18,140 +25,223 @@ Upload your contract, get a plain English breakdown, and know what to ask a lawy
 
 ## The Problem
 
-Millions of tenants in India sign rental agreements without fully understanding the terms. Legal language is hard to read, unfair clauses are easy to miss, and hiring a lawyer to review every agreement is not always practical.
+Millions of tenants in India sign rental agreements without fully understanding the terms. Legal language is dense, unfair clauses are easily missed, and hiring a lawyer to review every standard agreement is often expensive and inconvenient.
 
-**ClauseCheck bridges that gap.** It gives tenants a clear, jargon-free breakdown of their rental agreement so they can walk into a conversation with their landlord — or their lawyer — informed and prepared.
+Common pitfalls include:
+- Excessive security deposits (e.g. 10+ months without interest)
+- Automatic rent escalation clauses with steep year-on-year increases
+- Unrestricted landlord entry rights without notice
+- One-sided lock-in periods and unfair deposit forfeiture terms
+- Vague maintenance charges and arbitrary deduction rules
 
-## Who Is This For?
-
-| Audience | How ClauseCheck Helps |
-|---|---|
-| First-time renters | Explains what each clause actually means in plain English |
-| Tenants relocating to a new city | Flags region-specific unfair practices they may not recognize |
-| Anyone before signing | Generates a ready-made checklist of questions for a lawyer |
+**RentWise bridges this gap.** It gives tenants a clear, jargon-free breakdown of their agreement, highlighting risks and generating targeted questions for legal counsel.
 
 ---
 
 ## Features
 
-### 1. Upload or Paste
-Upload a PDF rental agreement or paste the full text directly. Text is extracted from PDFs automatically using **pypdf**. If a PDF is scanned (image-only), a clear error is shown.
-
-### 2. Plain English Summary
-Get exactly **5 bullet points** summarizing the agreement in simple words — no legal jargon, no ambiguity.
-
-### 3. Red Flag Detection
-AI-powered analysis identifies risky or unfair clauses. Each red flag includes:
-
-| Field | Description |
+| Feature | Description |
 |---|---|
-| **Clause Quote** | The exact text copied from your document |
-| **Risk** | Why this clause is a problem, in simple language |
-| **Severity** | High, Medium, or Low |
-| **Suggestion** | What to ask the landlord to change |
-
-Every quoted clause is **verified against the source text** — if a quote doesn't appear in the document, the flag is dropped automatically.
-
-### 4. Ask Questions
-A chat interface where you can ask follow-up questions about your document. Answers are grounded **only** in the uploaded text and always cite the relevant clause. If the answer isn't in the document, it says so.
-
-### 5. Lawyer Checklist
-A downloadable `.txt` file with specific questions to bring to a qualified lawyer, based on the actual content of your agreement.
+| **📄 PDF & Text Ingestion** | Upload a PDF or paste agreement text directly. Text is parsed in-memory using `pypdf`. Clear errors for scanned/image-only PDFs. |
+| **📝 5-Bullet Plain Summary** | Exactly 5 concise, jargon-free bullet points capturing the core terms (rent, deposit, duration, notice, obligations). |
+| **🚩 Verified Red Flags** | Identifies risky clauses with severity ratings (`High`, `Medium`, `Low`), tenant risk explanations, and renegotiation suggestions. |
+| **🔍 Quote Verification** | **Anti-hallucination engine:** Every quoted clause is verified verbatim against the source text. Unverified flags are discarded. |
+| **💬 Grounded Follow-up Q&A** | Chat interface to ask questions about the agreement. Responses are strictly grounded in document text and cite exact clauses. |
+| **⚖️ Lawyer Consultation List** | Generates tailored questions based on your specific contract to discuss with a qualified legal professional. |
+| **📋 Built-in Sample Contract** | One-click demo with a pre-loaded Indian rental agreement featuring realistic common traps. |
 
 ---
 
-## Screenshots
+## Architecture & Security
 
-*Coming soon*
-
----
-
-## Architecture
+### System Overview
 
 ```
-┌──────────┐      ┌──────────────┐      ┌────────────────┐
-│  Browser  │ ──── │  FastAPI API  │ ──── │  Gemini 2.5    │
-│  React    │      │  Python      │      │  Flash         │
-└──────────┘      └──────────────┘      └────────────────┘
-                         │
-                    pypdf (PDF extraction)
-                    Pydantic (validation)
+┌───────────────────────────┐
+│     Client (Browser)      │
+│  React (Vite) + Plain CSS │
+└─────────────┬─────────────┘
+              │ HTTPS / REST (JSON + Multipart)
+              ▼
+┌───────────────────────────┐
+│      FastAPI Backend      │
+│  • Memory-only processing │
+│  • Rate / size limits     │
+│  • Quote verification     │
+└─────────────┬─────────────┘
+              │ SSL / google-genai SDK
+              ▼
+┌───────────────────────────┐
+│   Google Gemini API       │
+│   (gemini-3.8-flash)      │
+└───────────────────────────┘
 ```
 
-- **Frontend** — React (Vite) + plain CSS, single-page app
-- **Backend** — Python FastAPI with `/analyze`, `/ask`, and `/health` endpoints
-- **AI** — Google Gemini API (`gemini-2.5-flash`) via the `google-genai` SDK
-- **Storage** — None. No database, no login. Documents processed in memory, never saved.
-- **Deploy** — Single Docker container targeting Google Cloud Run
+### Security & Privacy Controls
+
+1. **Zero Data Persistence**: No database, no user accounts, and no disk caching. Files are processed entirely in ephemeral RAM and discarded immediately.
+2. **Streaming File Upload Limit (5 MB)**: Uploads are read in chunks up to 5 MB. Files exceeding 5 MB are aborted immediately with `HTTP 413 Payload Too Large`, preventing memory exhaustion / DoS attacks.
+3. **Input Quota Protections**:
+   - `/ask` question capped at **2,000 characters**.
+   - Document text capped at **100,000 characters** (~50 pages of plain text).
+   - Minimum text threshold (50 characters) prevents empty/useless API invocations.
+4. **Sanitized Error Responses**: Internal tracebacks, file paths, and exception messages are logged strictly server-side and never exposed to the client.
+5. **Restricted CORS**: Whitelisted origins for local development and production (`https://rentwise-juvt.onrender.com`), restricted to `GET`, `POST`, and `OPTIONS`.
+6. **Credential Protection**: `GEMINI_API_KEY` is loaded exclusively from environment variables. Git history is audited and contains no credentials.
 
 ---
 
-## Run Locally
+## API Reference
+
+### `GET /health`
+Health check endpoint.
+- **Response:** `200 OK`
+```json
+{ "status": "ok" }
+```
+
+### `GET /sample`
+Retrieves the built-in sample rental agreement for testing and demonstration.
+- **Response:** `200 OK`
+```json
+{ "text": "RENTAL AGREEMENT\nThis Rental Agreement..." }
+```
+
+### `POST /analyze`
+Analyzes a rental agreement supplied as a PDF file or pasted text form.
+- **Parameters:**
+  - `file`: `UploadFile` (optional, max 5 MB)
+  - `text`: `string` (optional, 50 to 100,000 characters)
+- **Response:** `200 OK`
+```json
+{
+  "summary": ["Monthly rent is Rs. 25,000.", "..."],
+  "red_flags": [
+    {
+      "clause_quote": "The tenant shall pay a security deposit of Rs. 2,50,000 equivalent to 10 months rent.",
+      "risk": "10 months deposit is excessively high for Indian rental norms.",
+      "severity": "High",
+      "suggestion": "Request reducing security deposit to standard 2-3 months rent."
+    }
+  ],
+  "flags": [ ... ],
+  "lawyer_questions": ["Is the lock-in period legally enforceable?"],
+  "document_text": "Full extracted text..."
+}
+```
+
+### `POST /ask`
+Answers follow-up questions grounded strictly in the provided document text.
+- **Payload:**
+```json
+{
+  "document_text": "Agreement text here...",
+  "question": "What is the notice period for terminating the agreement?"
+}
+```
+- **Response:** `200 OK`
+```json
+{
+  "answer": "The agreement specifies a notice period of 1 month in writing.",
+  "source_quote": "Either party may terminate by providing one month written notice."
+}
+```
+
+---
+
+## Local Development
 
 ### Prerequisites
 
-- Python 3.12+
-- Node.js 18+
-- A [Google Gemini API key](https://aistudio.google.com/apikey)
+- **Python 3.10+**
+- **Node.js 18+**
+- A [Google Gemini API Key](https://aistudio.google.com/apikey)
 
-### Backend
+### 1. Clone & Setup Backend
 
 ```bash
-cd backend
-python -m venv venv
+# Clone the repository
+git clone https://github.com/dpkpaswan/rentwise.git
+cd rentwise/backend
 
-# Activate virtual environment
+# Create and activate virtual environment
+python -m venv venv
 source venv/bin/activate        # macOS / Linux
 venv\Scripts\activate           # Windows
 
+# Install dependencies
 pip install -r requirements.txt
 
-# Set your API key
-export GEMINI_API_KEY=your-key-here        # macOS / Linux
-set GEMINI_API_KEY=your-key-here           # Windows
+# Set Gemini API key
+export GEMINI_API_KEY=your_gemini_api_key_here     # macOS / Linux
+$env:GEMINI_API_KEY="your_gemini_api_key_here"      # Windows PowerShell
 
+# Start FastAPI server
 uvicorn main:app --reload --port 8000
 ```
 
-### Frontend
+### 2. Setup Frontend
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 npm run dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+Visit [http://localhost:5173](http://localhost:5173) in your browser.
 
-### Running Tests
+---
 
-Run the automated test suite covering API endpoints, input validation, security boundaries, and red-flag quote verification:
+## Running Tests
+
+RentWise includes a comprehensive automated test suite powered by `pytest` and `httpx`.
+
+The suite covers:
+- Endpoint health and status codes
+- Input validation (empty text, whitespace, missing fields)
+- Server-side file upload limits (5 MB rejection with HTTP 413)
+- API character limits (2,000-char questions, 100k-char documents)
+- Information leakage and traceback prevention
+- Anti-hallucination clause quote verification logic
 
 ```bash
-# From repository root
+# From repository root:
 pytest tests/
 
-# Or from within backend directory
+# Or with verbose output:
+pytest tests/ -v
+
+# Or from within the backend directory:
 cd backend
-pytest tests/
+pytest tests/ -v
 ```
 
 ---
 
+## Deployment
 
-## Deploy to Google Cloud Run
+### Deploy to Render (Docker Web Service)
+
+1. Connect your GitHub repository to [Render](https://render.com).
+2. Create a new **Web Service** using Docker.
+3. Configure the following environment variables:
+   - `GEMINI_API_KEY`: Your Google Gemini API key
+   - `PORT`: `8080` (or leave default)
+4. Deploy! The multi-stage `Dockerfile` automatically builds the React SPA and serves it from FastAPI.
+
+### Deploy to Google Cloud Run
 
 ```bash
-# 1. Build and push the Docker image
-gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/clausecheck
+# 1. Build and push image to Google Artifact Registry / GCR
+gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/rentwise
 
 # 2. Deploy to Cloud Run
-gcloud run deploy clausecheck \
-  --image gcr.io/YOUR_PROJECT_ID/clausecheck \
+gcloud run deploy rentwise \
+  --image gcr.io/YOUR_PROJECT_ID/rentwise \
   --platform managed \
   --region asia-south1 \
   --allow-unauthenticated \
-  --set-env-vars GEMINI_API_KEY=your-key-here
+  --set-env-vars GEMINI_API_KEY=your-api-key-here
 ```
 
 ---
@@ -159,45 +249,40 @@ gcloud run deploy clausecheck \
 ## Project Structure
 
 ```
-ClauseCheck/
+rentwise/
 ├── backend/
-│   ├── main.py                 # FastAPI app with all endpoints
-│   ├── models.py               # Pydantic request/response models
-│   ├── gemini_service.py       # Gemini API integration + quote verification
-│   ├── sample_agreement.py     # Built-in sample for demo purposes
-│   └── requirements.txt        # Python dependencies
+│   ├── main.py                  # FastAPI application with endpoints & middleware
+│   ├── models.py                # Pydantic data schemas with validation
+│   ├── gemini_service.py        # Gemini API integration & quote verification
+│   ├── sample_agreement.py      # Sample Indian rental agreement for testing
+│   ├── requirements.txt         # Backend dependencies (fastapi, pypdf, pytest, etc.)
+│   └── tests/
+│       ├── __init__.py
+│       ├── test_api.py          # API route & boundary test cases
+│       └── test_verify_quotes.py# Anti-hallucination quote verification unit tests
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx             # Main React component (single page)
-│   │   ├── index.css           # Complete design system
-│   │   └── main.jsx            # Entry point
-│   ├── index.html              # HTML template with SEO meta tags
-│   ├── vite.config.js          # Vite config with API proxy
-│   └── package.json
-├── Dockerfile                  # Multi-stage build for Cloud Run
-├── .env.example                # Environment variable template
-├── .gitignore
-└── README.md
+│   │   ├── App.jsx              # Main React SPA component
+│   │   ├── index.css            # Complete design system & responsive styling
+│   │   └── main.jsx             # React entry point
+│   ├── index.html               # HTML5 template with SEO meta tags
+│   ├── vite.config.js           # Vite dev proxy configuration
+│   └── package.json             # Frontend dependencies & scripts
+├── tests/                       # Root test runner package
+│   ├── __init__.py
+│   ├── test_api.py
+│   └── test_verify_quotes.py
+├── Dockerfile                   # Multi-stage production build (Node + Python)
+├── pytest.ini                   # Pytest configuration
+├── .gitignore                   # Excludes venv, node_modules, .env, dist
+├── .env.example                 # Environment template
+└── README.md                    # Project documentation
 ```
-
----
-
-## Limitations
-
-| Limitation | Detail |
-|---|---|
-| **PDF text only** | Scanned documents (images inside PDFs) cannot be read. A clear error is shown. |
-| **Not legal advice** | AI may miss issues or misunderstand context. Always consult a lawyer. |
-| **No persistence** | Results are not saved. Refreshing the page requires re-uploading. |
-| **5 MB file limit** | Large PDFs must be trimmed before uploading. |
-| **English only** | Works best with agreements written in English. |
-| **AI accuracy** | Clause quotes are verified, but risk assessments are AI-generated and may not cover every scenario. |
 
 ---
 
 <div align="center">
 
-**This tool provides general information only, not legal advice.**
-**Consult a qualified lawyer before signing any rental agreement.**
+**RentWise — Empowering tenants with transparent, accessible contract intelligence.**
 
 </div>

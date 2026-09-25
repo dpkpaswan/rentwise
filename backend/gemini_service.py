@@ -7,7 +7,7 @@ from google import genai
 logger = logging.getLogger(__name__)
 
 _client = None
-MODEL = "gemini-2.5-flash"
+MODEL = "gemini-3.8-flash"
 
 
 def _get_client():

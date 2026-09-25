@@ -23,5 +23,5 @@ COPY --from=frontend-build /app/frontend/dist ./static
 # Expose port
 EXPOSE 8080
 
-# Run with uvicorn
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Run with uvicorn — uses Render's PORT env var, falls back to 8080 for Cloud Run
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}

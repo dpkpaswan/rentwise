@@ -3,6 +3,22 @@ import './index.css'
 
 const API_BASE = import.meta.env.VITE_API_URL || ''
 
+/**
+ * Extract a human-readable error message from a FastAPI/Pydantic error response.
+ * Pydantic 422 responses return { detail: [{msg, loc, ...}, ...] } (array),
+ * while custom HTTPExceptions return { detail: "string" }.
+ */
+function extractErrorDetail(errData, fallback = 'Something went wrong.') {
+  if (!errData || !errData.detail) return fallback
+  if (typeof errData.detail === 'string') return errData.detail
+  if (Array.isArray(errData.detail)) {
+    return errData.detail
+      .map((e) => e.msg || JSON.stringify(e))
+      .join('; ')
+  }
+  return fallback
+}
+
 function App() {
   const [file, setFile] = useState(null)
   const [pastedText, setPastedText] = useState('')
@@ -67,7 +83,7 @@ function App() {
       })
       if (!res.ok) {
         const errData = await res.json()
-        throw new Error(errData.detail || 'Analysis failed')
+        throw new Error(extractErrorDetail(errData, 'Analysis failed'))
       }
       const data = await res.json()
       setResults(data)
@@ -93,7 +109,7 @@ function App() {
         })
         if (!res.ok) {
           const errData = await res.json()
-          throw new Error(errData.detail || 'Analysis failed')
+          throw new Error(extractErrorDetail(errData, 'Analysis failed'))
         }
         const data = await res.json()
         setResults(data)
@@ -126,7 +142,7 @@ function App() {
       })
       if (!res.ok) {
         const errData = await res.json()
-        throw new Error(errData.detail || 'Failed to get answer')
+        throw new Error(extractErrorDetail(errData, 'Failed to get answer'))
       }
       const data = await res.json()
       setChatMessages(prev => [...prev, {
@@ -212,7 +228,7 @@ function App() {
       </div>
 
       {/* Error */}
-      {error && <div className="error-message" id="error-message">{error}</div>}
+      {error && <div className="error-message" id="error-message" role="alert">{error}</div>}
 
       {/* Upload Section */}
       {!results && !loading && (
@@ -224,8 +240,13 @@ function App() {
             onDragOver={handleDrag}
             onDrop={handleDrop}
             onClick={() => document.getElementById('file-input').click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.getElementById('file-input').click() } }}
+            role="button"
+            tabIndex="0"
+            aria-label="Upload rental agreement PDF"
             id="upload-zone"
           >
+            <label htmlFor="file-input" className="sr-only">Upload rental agreement PDF</label>
             <input
               type="file"
               id="file-input"
@@ -233,7 +254,7 @@ function App() {
               onChange={handleFileInput}
               style={{ display: 'none' }}
             />
-            <span className="upload-zone__icon">&#8593;</span>
+            <span className="upload-zone__icon" aria-hidden="true">&#8593;</span>
             <p className="upload-zone__text">
               Drop your rental agreement PDF here, or click to browse
             </p>
@@ -255,6 +276,7 @@ function App() {
 
           <div className="upload-divider">or paste text</div>
 
+          <label htmlFor="text-input" className="sr-only">Paste rental agreement text</label>
           <textarea
             className="text-input-area"
             placeholder="Paste the full text of your rental agreement here..."
@@ -368,6 +390,7 @@ function App() {
                 </div>
               )}
               <div className="chat-input-area">
+                <label htmlFor="chat-input" className="sr-only">Ask a question about your agreement</label>
                 <input
                   type="text"
                   className="chat-input"
